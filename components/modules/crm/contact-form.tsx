@@ -1,0 +1,366 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { Plus, X, User, Building, Mail, Phone, MapPin, Tag } from 'lucide-react';
+import { Contact, CRMService } from '@/lib/crm-data';
+
+interface ContactFormProps {
+  contact?: Contact;
+  onSave: (contact: Contact) => void;
+  onCancel: () => void;
+  trigger?: React.ReactNode;
+}
+
+export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormProps) {
+  const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: contact?.name || '',
+    email: contact?.email || '',
+    phone: contact?.phone || '',
+    company: contact?.company || '',
+    position: contact?.position || '',
+    address: contact?.address || '',
+    category: contact?.category || 'Prospect',
+    status: contact?.status || 'Prospect',
+    assignedTo: contact?.assignedTo || '',
+    source: contact?.source || '',
+    notes: contact?.notes || '',
+    linkedin: contact?.socialMedia?.linkedin || '',
+    twitter: contact?.socialMedia?.twitter || '',
+    facebook: contact?.socialMedia?.facebook || ''
+  });
+  const [tags, setTags] = useState<string[]>(contact?.tags || []);
+  const [newTag, setNewTag] = useState('');
+
+  const crmService = CRMService.getInstance();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.email) {
+      toast.error('Name and email are required');
+      return;
+    }
+
+    const contactData = {
+      ...formData,
+      tags,
+      socialMedia: {
+        linkedin: formData.linkedin,
+        twitter: formData.twitter,
+        facebook: formData.facebook
+      }
+    };
+
+    try {
+      let savedContact: Contact;
+      if (contact) {
+        savedContact = crmService.updateContact(contact.id, contactData) as Contact;
+        toast.success('Contact updated successfully');
+      } else {
+        savedContact = crmService.createContact(contactData as any);
+        toast.success('Contact created successfully');
+      }
+      
+      onSave(savedContact);
+      setOpen(false);
+      
+      // Reset form if creating new contact
+      if (!contact) {
+        setFormData({
+          name: '', email: '', phone: '', company: '', position: '', address: '',
+          category: 'Prospect', status: 'Prospect', assignedTo: '', source: '', notes: '',
+          linkedin: '', twitter: '', facebook: ''
+        });
+        setTags([]);
+      }
+    } catch (error) {
+      toast.error('Failed to save contact');
+    }
+  };
+
+  const addTag = () => {
+    if (newTag.trim() && !tags.includes(newTag.trim())) {
+      setTags([...tags, newTag.trim()]);
+      setNewTag('');
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Contact
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center">
+            <User className="w-5 h-5 mr-2" />
+            {contact ? 'Edit Contact' : 'Add New Contact'}
+          </DialogTitle>
+          <DialogDescription>
+            {contact ? 'Update contact information and details' : 'Create a new contact in your CRM system'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <User className="w-4 h-4 mr-2" />
+                  Basic Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter full name"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="Enter email address"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Enter phone number"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="address">Address</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="Enter address"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Company Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <Building className="w-4 h-4 mr-2" />
+                  Company Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="company">Company</Label>
+                  <Input
+                    id="company"
+                    value={formData.company}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="position">Position</Label>
+                  <Input
+                    id="position"
+                    value={formData.position}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    placeholder="Enter job position"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value as any })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Client">Client</SelectItem>
+                      <SelectItem value="Prospect">Prospect</SelectItem>
+                      <SelectItem value="Partner">Partner</SelectItem>
+                      <SelectItem value="Vendor">Vendor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as any })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                      <SelectItem value="Prospect">Prospect</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Additional Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Assignment & Source</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="assignedTo">Assigned To</Label>
+                  <Select value={formData.assignedTo} onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="John Doe">John Doe</SelectItem>
+                      <SelectItem value="Jane Smith">Jane Smith</SelectItem>
+                      <SelectItem value="Carlos Mendez">Carlos Mendez</SelectItem>
+                      <SelectItem value="Ana Torres">Ana Torres</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="source">Source</Label>
+                  <Select value={formData.source} onValueChange={(value) => setFormData({ ...formData, source: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Website">Website</SelectItem>
+                      <SelectItem value="Referral">Referral</SelectItem>
+                      <SelectItem value="Cold Call">Cold Call</SelectItem>
+                      <SelectItem value="Trade Show">Trade Show</SelectItem>
+                      <SelectItem value="Social Media">Social Media</SelectItem>
+                      <SelectItem value="Advertisement">Advertisement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <Tag className="w-4 h-4 mr-2" />
+                  Tags & Social Media
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Tags</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                        {tag}
+                        <X
+                          className="w-3 h-3 cursor-pointer hover:text-red-500"
+                          onClick={() => removeTag(tag)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Add tag"
+                    />
+                    <Button type="button" onClick={addTag} size="sm">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="linkedin">LinkedIn</Label>
+                  <Input
+                    id="linkedin"
+                    value={formData.linkedin}
+                    onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
+                    placeholder="LinkedIn profile URL"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Notes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Add any additional notes about this contact..."
+                rows={4}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700">
+              {contact ? 'Update Contact' : 'Create Contact'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
