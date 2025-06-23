@@ -1,0 +1,15 @@
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\controller\ContactController.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\model\Communication.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\model\ContactCategory.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\controller\CommunicationController.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\controller\TestController.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\config\CorsConfig.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\ErpBackendApplication.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\service\ContactService.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\exception\GlobalExceptionHandler.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\service\CommunicationService.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\model\Contact.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\model\CommunicationType.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\model\ContactStatus.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\repository\ContactRepository.java
+C:\Users\Kadimar\Videos\erp_system\erp\backend\src\main\java\com\kadimar\erp\repository\CommunicationRepository.java

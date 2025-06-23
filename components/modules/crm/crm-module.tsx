@@ -45,8 +45,8 @@ export function CRMModule() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showCommunications, setShowCommunications] = useState(false);
 
@@ -117,8 +117,8 @@ export function CRMModule() {
       contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.company?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesCategory = !filterCategory || contact.category === filterCategory;
-    const matchesStatus = !filterStatus || contact.status === filterStatus;
+    const matchesCategory = !filterCategory || filterCategory === 'all' || contact.category === filterCategory;
+    const matchesStatus = !filterStatus || filterStatus === 'all' || contact.status === filterStatus;
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
@@ -212,7 +212,7 @@ export function CRMModule() {
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="all">All Categories</SelectItem>
                     <SelectItem value="Client">Client</SelectItem>
                     <SelectItem value="Prospect">Prospect</SelectItem>
                     <SelectItem value="Partner">Partner</SelectItem>
@@ -224,7 +224,7 @@ export function CRMModule() {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Inactive">Inactive</SelectItem>
                     <SelectItem value="Prospect">Prospect</SelectItem>

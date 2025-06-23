@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KADIMAR ERP Backend Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .run-all-button {
+            background: #28a745;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 15px 30px;
+        }
+        .run-all-button:hover {
+            background: #1e7e34;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.running {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .endpoint-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .endpoint-info h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .endpoint-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .endpoint-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .endpoint-list li:last-child {
+            border-bottom: none;
+        }
+        .method {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .method.get { background: #28a745; color: white; }
+        .method.post { background: #007bff; color: white; }
+        .method.put { background: #ffc107; color: black; }
+        .method.delete { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ KADIMAR ERP Backend Test Suite</h1>
+        
+        <div class="endpoint-info">
+            <h3>📋 Backend Information</h3>
+            <p><strong>Base URL:</strong> <code id="baseUrl">http://localhost:8080/api</code></p>
+            <p><strong>Status:</strong> <span id="serverStatus" class="status">Unknown</span></p>
+            <p><strong>Instructions:</strong> Make sure your Spring Boot backend is running before testing.</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🚀 Quick Test</h3>
+            <button class="test-button run-all-button" onclick="runAllTests()">Run All Tests</button>
+            <div id="allTestsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Individual Tests</h3>
+            <button class="test-button" onclick="testHealth()">Health Check</button>
+            <button class="test-button" onclick="testDatabase()">Database Test</button>
+            <button class="test-button" onclick="testCors()">CORS Test</button>
+            <button class="test-button" onclick="testCreateContact()">Create Contact</button>
+            <button class="test-button" onclick="testGetContacts()">Get Contacts</button>
+            <button class="test-button" onclick="testStats()">Get Statistics</button>
+            <div id="individualTestResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="endpoint-info">
+            <h3>📡 Available API Endpoints</h3>
+            <ul class="endpoint-list">
+                <li><span class="method get">GET</span> <code>/api/test/health</code> - Health check</li>
+                <li><span class="method get">GET</span> <code>/api/test/database</code> - Database connectivity</li>
+                <li><span class="method get">GET</span> <code>/api/test/cors</code> - CORS configuration</li>
+                <li><span class="method get">GET</span> <code>/api/contacts</code> - Get all contacts</li>
+                <li><span class="method post">POST</span> <code>/api/contacts</code> - Create contact</li>
+                <li><span class="method get">GET</span> <code>/api/contacts/{id}</code> - Get contact by ID</li>
+                <li><span class="method put">PUT</span> <code>/api/contacts/{id}</code> - Update contact</li>
+                <li><span class="method delete">DELETE</span> <code>/api/contacts/{id}</code> - Delete contact</li>
+                <li><span class="method get">GET</span> <code>/api/contacts/stats</code> - Contact statistics</li>
+                <li><span class="method get">GET</span> <code>/api/communications</code> - Get all communications</li>
+                <li><span class="method post">POST</span> <code>/api/communications</code> - Create communication</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8080/api';
+        
+        function updateServerStatus(status, className) {
+            const statusElement = document.getElementById('serverStatus');
+            statusElement.textContent = status;
+            statusElement.className = `status ${className}`;
+        }
+        
+        function showResult(elementId, content, className = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.className = `result ${className}`;
+            element.style.display = 'block';
+        }
+        
+        async function testHealth() {
+            showResult('individualTestResult', 'Testing health endpoint...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/test/health`);
+                const data = await response.json();
+                showResult('individualTestResult', `✅ Health Check Passed\n${JSON.stringify(data, null, 2)}`, 'success');
+                updateServerStatus('Online', 'success');
+            } catch (error) {
+                showResult('individualTestResult', `❌ Health Check Failed\n${error.message}`, 'error');
+                updateServerStatus('Offline', 'failed');
+            }
+        }
+        
+        async function testDatabase() {
+            showResult('individualTestResult', 'Testing database connection...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/test/database`);
+                const data = await response.json();
+                if (response.ok) {
+                    showResult('individualTestResult', `✅ Database Test Passed\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('individualTestResult', `⚠️ Database Test Warning\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('individualTestResult', `❌ Database Test Failed\n${error.message}`, 'error');
+            }
+        }
+        
+        async function testCors() {
+            showResult('individualTestResult', 'Testing CORS configuration...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/test/cors`);
+                const data = await response.json();
+                showResult('individualTestResult', `✅ CORS Test Passed\n${JSON.stringify(data, null, 2)}`, 'success');
+            } catch (error) {
+                showResult('individualTestResult', `❌ CORS Test Failed\n${error.message}`, 'error');
+            }
+        }
+        
+        async function testCreateContact() {
+            showResult('individualTestResult', 'Testing contact creation...', 'info');
+            const testContact = {
+                name: 'Test User',
+                email: `test.user.${Date.now()}@example.com`,
+                phone: '+1234567890',
+                company: 'Test Company',
+                category: 'CLIENT',
+                status: 'ACTIVE'
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/contacts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testContact)
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('individualTestResult', `✅ Contact Created Successfully\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult('individualTestResult', `❌ Contact Creation Failed\n${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('individualTestResult', `❌ Contact Creation Error\n${error.message}`, 'error');
+            }
+        }
+        
+        async function testGetContacts() {
+            showResult('individualTestResult', 'Testing get contacts...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/contacts`);
+                const data = await response.json();
+                showResult('individualTestResult', `✅ Contacts Retrieved\nCount: ${data.length}\n${JSON.stringify(data.slice(0, 2), null, 2)}${data.length > 2 ? '\n... and more' : ''}`, 'success');
+            } catch (error) {
+                showResult('individualTestResult', `❌ Get Contacts Failed\n${error.message}`, 'error');
+            }
+        }
+        
+        async function testStats() {
+            showResult('individualTestResult', 'Testing statistics...', 'info');
+            try {
+                const response = await fetch(`${API_BASE_URL}/contacts/stats`);
+                const data = await response.json();
+                showResult('individualTestResult', `✅ Statistics Retrieved\n${JSON.stringify(data, null, 2)}`, 'success');
+            } catch (error) {
+                showResult('individualTestResult', `❌ Statistics Failed\n${error.message}`, 'error');
+            }
+        }
+        
+        async function runAllTests() {
+            showResult('allTestsResult', 'Running all tests...\n', 'info');
+            let results = [];
+            
+            const tests = [
+                { name: 'Health Check', fn: () => fetch(`${API_BASE_URL}/test/health`) },
+                { name: 'Database Test', fn: () => fetch(`${API_BASE_URL}/test/database`) },
+                { name: 'CORS Test', fn: () => fetch(`${API_BASE_URL}/test/cors`) },
+                { name: 'Get Contacts', fn: () => fetch(`${API_BASE_URL}/contacts`) },
+                { name: 'Contact Stats', fn: () => fetch(`${API_BASE_URL}/contacts/stats`) }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    const response = await test.fn();
+                    const success = response.ok;
+                    results.push(`${success ? '✅' : '❌'} ${test.name}: ${success ? 'PASSED' : 'FAILED'}`);
+                    if (test.name === 'Health Check' && success) {
+                        updateServerStatus('Online', 'success');
+                    }
+                } catch (error) {
+                    results.push(`❌ ${test.name}: FAILED (${error.message})`);
+                }
+            }
+            
+            const passed = results.filter(r => r.includes('✅')).length;
+            const total = results.length;
+            
+            const summary = `\n${'='.repeat(50)}\n📊 Test Results: ${passed}/${total} passed\n${'='.repeat(50)}\n\n${results.join('\n')}\n\n${passed === total ? '🎉 All tests passed!' : '⚠️ Some tests failed.'}`;
+            
+            showResult('allTestsResult', summary, passed === total ? 'success' : 'error');
+        }
+        
+        // Check server status on page load
+        window.addEventListener('load', () => {
+            testHealth();
+        });
+    </script>
+</body>
+</html>

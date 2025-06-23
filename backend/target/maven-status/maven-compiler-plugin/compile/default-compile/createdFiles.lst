@@ -1,0 +1,15 @@
+com\kadimar\erp\controller\CommunicationController.class
+com\kadimar\erp\controller\ContactController.class
+com\kadimar\erp\controller\TestController.class
+com\kadimar\erp\model\ContactCategory.class
+com\kadimar\erp\repository\ContactRepository.class
+com\kadimar\erp\model\Communication.class
+com\kadimar\erp\service\CommunicationService.class
+com\kadimar\erp\repository\CommunicationRepository.class
+com\kadimar\erp\service\ContactService.class
+com\kadimar\erp\model\Contact.class
+com\kadimar\erp\config\CorsConfig.class
+com\kadimar\erp\exception\GlobalExceptionHandler.class
+com\kadimar\erp\ErpBackendApplication.class
+com\kadimar\erp\model\CommunicationType.class
+com\kadimar\erp\model\ContactStatus.class

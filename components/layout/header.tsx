@@ -52,7 +52,7 @@ export function Header({ setSidebarOpen }: HeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src="/avatars/01.png" alt="User" />
+                  <AvatarImage src="/avatars/01.svg" alt="User" />
                   <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white font-medium">
                     JD
                   </AvatarFallback>

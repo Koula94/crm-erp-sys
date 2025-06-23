@@ -146,7 +146,7 @@ export function CommunicationTracker({ contactId, contact }: CommunicationTracke
                     <Label htmlFor="type">Communication Type</Label>
                     <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value as Communication['type'] })}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select communication type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Call">Phone Call</SelectItem>
