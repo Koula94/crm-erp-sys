@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Plus, X, User, Building, Mail, Phone, MapPin, Tag } from 'lucide-react';
-import { Contact, CRMService } from '@/lib/crm-data';
+import { Contact } from '@/types/crm';
+import { ApiCrmService, ApiContact } from './api-crm-service';
+import { ContactCategory, ContactStatus } from '@/constants/crm';
 
 interface ContactFormProps {
   contact?: Contact;
@@ -22,6 +24,8 @@ interface ContactFormProps {
 
 export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormProps) {
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [backendHealthy, setBackendHealthy] = useState(false);
   const [formData, setFormData] = useState({
     name: contact?.name || '',
     email: contact?.email || '',
@@ -41,9 +45,23 @@ export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormP
   const [tags, setTags] = useState<string[]>(contact?.tags || []);
   const [newTag, setNewTag] = useState('');
 
-  const crmService = CRMService.getInstance();
+  const apiCrmService: any = new ApiCrmService();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    checkBackendHealth();
+  }, []);
+
+  const checkBackendHealth = async () => {
+    try {
+      await apiCrmService.checkHealth();
+      setBackendHealthy(true);
+    } catch (error) {
+      setBackendHealthy(false);
+      toast.error('Backend connection failed - please check server status');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.email) {
@@ -51,28 +69,132 @@ export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormP
       return;
     }
 
-    const contactData = {
-      ...formData,
-      tags,
-      socialMedia: {
-        linkedin: formData.linkedin,
-        twitter: formData.twitter,
-        facebook: formData.facebook
-      }
-    };
-
     try {
+      setIsLoading(true);
+      
+      const contactData = {
+        ...formData,
+        tags,
+        socialMedia: {
+          linkedin: formData.linkedin,
+          twitter: formData.twitter,
+          facebook: formData.facebook
+        }
+      };
+
+      if (!backendHealthy) {
+        toast.error('Backend connection failed - cannot save contact');
+        return;
+      }
+      
       let savedContact: Contact;
+      
       if (contact) {
-        savedContact = crmService.updateContact(contact.id, contactData) as Contact;
-        toast.success('Contact updated successfully');
+        // Update existing contact
+        const apiContact: ApiContact = {
+          id: parseInt(contact.id),
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          position: formData.position,
+          address: formData.address,
+          category: formData.category as ContactCategory,
+        status: formData.status as ContactStatus,
+          assignedTo: formData.assignedTo,
+          source: formData.source,
+          notes: formData.notes,
+          tags: tags,
+          socialMedia: {
+            linkedin: formData.linkedin,
+            twitter: formData.twitter,
+            facebook: formData.facebook
+          },
+          createdAt: contact.createdAt,
+          updatedAt: new Date().toISOString()
+        };
+        
+        const updateResponse = await apiCrmService.updateContact(apiContact.id, apiContact);
+        if (updateResponse.error) {
+          throw new Error(updateResponse.error);
+        }
+        const updatedApiContact = updateResponse.data!;
+        savedContact = {
+          id: updatedApiContact.id?.toString() || contact.id,
+          name: updatedApiContact.name,
+          email: updatedApiContact.email,
+          phone: updatedApiContact.phone,
+          company: updatedApiContact.company,
+          position: updatedApiContact.position,
+          address: updatedApiContact.address,
+          category: updatedApiContact.category,
+          status: updatedApiContact.status,
+          assignedTo: updatedApiContact.assignedTo,
+          source: updatedApiContact.source,
+          notes: updatedApiContact.notes,
+          tags: updatedApiContact.tags || tags,
+          socialMedia: updatedApiContact.socialMedia || {
+            linkedin: formData.linkedin,
+            twitter: formData.twitter,
+            facebook: formData.facebook
+          },
+          createdAt: updatedApiContact.createdAt,
+          updatedAt: updatedApiContact.updatedAt
+        };
       } else {
-        savedContact = crmService.createContact(contactData as any);
-        toast.success('Contact created successfully');
+        // Create new contact
+        const newApiContact: Omit<ApiContact, 'id' | 'createdAt' | 'updatedAt'> = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          position: formData.position,
+          address: formData.address,
+          category: formData.category as ContactCategory,
+        status: formData.status as ContactStatus,
+          assignedTo: formData.assignedTo,
+          source: formData.source,
+          notes: formData.notes,
+          tags: tags,
+          socialMedia: {
+            linkedin: formData.linkedin,
+            twitter: formData.twitter,
+            facebook: formData.facebook
+          }
+        };
+        
+        const createResponse = await apiCrmService.createContact(newApiContact);
+        if (createResponse.error) {
+          throw new Error(createResponse.error);
+        }
+        const createdApiContact = createResponse.data!;
+        savedContact = {
+          id: createdApiContact.id?.toString() || Date.now().toString(),
+          name: createdApiContact.name,
+          email: createdApiContact.email,
+          phone: createdApiContact.phone,
+          company: createdApiContact.company,
+          position: createdApiContact.position,
+          address: createdApiContact.address,
+          category: createdApiContact.category,
+          status: createdApiContact.status,
+          assignedTo: createdApiContact.assignedTo,
+          source: createdApiContact.source,
+          notes: createdApiContact.notes,
+          tags: createdApiContact.tags || tags,
+          socialMedia: createdApiContact.socialMedia || {
+            linkedin: formData.linkedin,
+            twitter: formData.twitter,
+            facebook: formData.facebook
+          },
+          createdAt: createdApiContact.createdAt,
+          updatedAt: createdApiContact.updatedAt
+        };
       }
       
       onSave(savedContact);
       setOpen(false);
+      toast.success(contact ? 'Contact updated successfully' : 'Contact created successfully');
       
       // Reset form if creating new contact
       if (!contact) {
@@ -84,7 +206,9 @@ export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormP
         setTags([]);
       }
     } catch (error) {
-      toast.error('Failed to save contact');
+      toast.error(`Failed to save contact: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -226,10 +350,10 @@ export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormP
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Client">Client</SelectItem>
-                      <SelectItem value="Prospect">Prospect</SelectItem>
-                      <SelectItem value="Partner">Partner</SelectItem>
-                      <SelectItem value="Vendor">Vendor</SelectItem>
+                      <SelectItem value={ContactCategory.CLIENT}>Client</SelectItem>
+                      <SelectItem value={ContactCategory.PROSPECT}>Prospect</SelectItem>
+                      <SelectItem value={ContactCategory.PARTNER}>Partner</SelectItem>
+                      <SelectItem value={ContactCategory.VENDOR}>Vendor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -240,9 +364,9 @@ export function ContactForm({ contact, onSave, onCancel, trigger }: ContactFormP
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Inactive">Inactive</SelectItem>
-                      <SelectItem value="Prospect">Prospect</SelectItem>
+                      <SelectItem value={ContactStatus.ACTIVE}>Active</SelectItem>
+                      <SelectItem value={ContactStatus.INACTIVE}>Inactive</SelectItem>
+                      <SelectItem value={ContactStatus.PROSPECT}>Prospect</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

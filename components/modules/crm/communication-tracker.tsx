@@ -21,7 +21,9 @@ import {
   User,
   MessageSquare
 } from 'lucide-react';
-import { Communication, Contact, CRMService } from '@/lib/crm-data';
+import { ApiCrmService, ApiCommunication } from './api-crm-service';
+import { Communication, Contact } from '@/types/crm';
+import { CommunicationType } from '@/constants/crm';
 
 interface CommunicationTrackerProps {
   contactId: string;
@@ -31,6 +33,8 @@ interface CommunicationTrackerProps {
 export function CommunicationTracker({ contactId, contact }: CommunicationTrackerProps) {
   const [communications, setCommunications] = useState<Communication[]>([]);
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [backendHealthy, setBackendHealthy] = useState(false);
   const [formData, setFormData] = useState({
     type: 'Call' as Communication['type'],
     subject: '',
@@ -42,18 +46,57 @@ export function CommunicationTracker({ contactId, contact }: CommunicationTracke
     nextAction: ''
   });
 
-  const crmService = CRMService.getInstance();
+  const apiCrmService: any = new ApiCrmService();
 
   useEffect(() => {
-    loadCommunications();
+    const initializeComponent = async () => {
+      await checkBackendHealth();
+      await loadCommunications();
+    };
+    initializeComponent();
   }, [contactId]);
 
-  const loadCommunications = () => {
-    const comms = crmService.getCommunications(contactId);
-    setCommunications(comms.sort((a, b) => new Date(b.date + ' ' + b.time).getTime() - new Date(a.date + ' ' + a.time).getTime()));
+  const checkBackendHealth = async () => {
+    try {
+      await apiCrmService.checkHealth();
+      setBackendHealthy(true);
+    } catch (error) {
+      setBackendHealthy(false);
+      toast.error('Backend connection failed - please check server status');
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadCommunications = async () => {
+    try {
+      setIsLoading(true);
+      
+      const apiCommunications = await apiCrmService.getCommunications();
+      const contactCommunications = apiCommunications
+        .filter(comm => comm.contactId === parseInt(contactId))
+        .map(apiComm => ({
+          id: apiComm.id.toString(),
+          contactId: apiComm.contactId.toString(),
+          type: apiComm.type as Communication['type'],
+          subject: apiComm.subject,
+          content: apiComm.content,
+          date: apiComm.date,
+          time: apiComm.time,
+          duration: apiComm.duration,
+          outcome: apiComm.outcome,
+          nextAction: apiComm.nextAction,
+          createdBy: apiComm.createdBy,
+          createdAt: apiComm.createdAt
+        }));
+      setCommunications(contactCommunications.sort((a, b) => new Date(b.date + ' ' + b.time).getTime() - new Date(a.date + ' ' + a.time).getTime()));
+    } catch (error) {
+      toast.error('Failed to load communications');
+      setCommunications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.subject || !formData.content) {
@@ -61,17 +104,50 @@ export function CommunicationTracker({ contactId, contact }: CommunicationTracke
       return;
     }
 
-    const communicationData = {
-      contactId,
-      ...formData,
-      duration: formData.duration ? parseInt(formData.duration) : undefined,
-      createdBy: 'Current User' // In real app, get from auth context
-    };
-
     try {
-      crmService.addCommunication(communicationData);
-      toast.success('Communication logged successfully');
-      loadCommunications();
+      setIsLoading(true);
+      
+      const newCommunication: Communication = {
+        id: Date.now().toString(),
+        contactId,
+        type: formData.type,
+        subject: formData.subject,
+        content: formData.content,
+        date: formData.date,
+        time: formData.time,
+        duration: formData.duration ? parseInt(formData.duration) : undefined,
+        outcome: formData.outcome,
+        nextAction: formData.nextAction,
+        createdBy: 'Current User', // In a real app, this would come from auth
+        createdAt: new Date().toISOString()
+      };
+
+      if (backendHealthy) {
+        try {
+          // Map to API format
+          const apiCommunication: Omit<ApiCommunication, 'id'> = {
+            contactId: parseInt(contactId),
+            type: formData.type,
+            subject: formData.subject,
+            content: formData.content,
+            date: formData.date,
+            time: formData.time,
+            duration: formData.duration ? parseInt(formData.duration) : undefined,
+            outcome: formData.outcome,
+            nextAction: formData.nextAction,
+            createdBy: 'Current User',
+            createdAt: new Date().toISOString()
+          };
+
+          await apiCrmService.addCommunication(apiCommunication);
+        } catch (apiError) {
+          throw new Error('Failed to save communication');
+        }
+      } else {
+        throw new Error('Backend is not available');
+      }
+
+      await loadCommunications();
       setOpen(false);
       
       // Reset form
@@ -85,8 +161,12 @@ export function CommunicationTracker({ contactId, contact }: CommunicationTracke
         outcome: '',
         nextAction: ''
       });
+      
+      toast.success('Communication logged successfully');
     } catch (error) {
-      toast.error('Failed to log communication');
+      toast.error(`Failed to log communication: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -146,15 +226,15 @@ export function CommunicationTracker({ contactId, contact }: CommunicationTracke
                     <Label htmlFor="type">Communication Type</Label>
                     <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value as Communication['type'] })}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select communication type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Call">Phone Call</SelectItem>
-                        <SelectItem value="Email">Email</SelectItem>
-                        <SelectItem value="Meeting">Meeting</SelectItem>
-                        <SelectItem value="Note">Note</SelectItem>
-                        <SelectItem value="Task">Task</SelectItem>
-                      </SelectContent>
+                      <SelectItem value={CommunicationType.CALL}>Call</SelectItem>
+                      <SelectItem value={CommunicationType.EMAIL}>Email</SelectItem>
+                      <SelectItem value={CommunicationType.MEETING}>Meeting</SelectItem>
+                      <SelectItem value={CommunicationType.NOTE}>Note</SelectItem>
+                      <SelectItem value={CommunicationType.TASK}>Task</SelectItem>
+                    </SelectContent>
                     </Select>
                   </div>
                   <div>

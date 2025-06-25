@@ -22,12 +22,16 @@ import {
   Target,
   ArrowRight
 } from 'lucide-react';
-import { Lead, CRMService } from '@/lib/crm-data';
+import { Lead, Contact } from '@/types/crm';
+import { ApiCrmService, ApiLead } from './api-crm-service';
+import { LeadStage } from '@/constants/crm';
 
 export function LeadPipeline() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [backendHealthy, setBackendHealthy] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -41,63 +45,211 @@ export function LeadPipeline() {
     notes: ''
   });
 
-  const crmService = CRMService.getInstance();
+  const apiCrmService: any = ApiCrmService.getInstance();
 
   const pipelineStages = [
-    { name: 'New', color: 'bg-gray-500', probability: 10 },
-    { name: 'Contacted', color: 'bg-blue-500', probability: 25 },
-    { name: 'Qualified', color: 'bg-yellow-500', probability: 50 },
-    { name: 'Proposal', color: 'bg-orange-500', probability: 75 },
-    { name: 'Negotiation', color: 'bg-purple-500', probability: 90 },
-    { name: 'Closed Won', color: 'bg-green-500', probability: 100 },
-    { name: 'Closed Lost', color: 'bg-red-500', probability: 0 }
+    { name: LeadStage.PROSPECT, displayName: 'Prospect', color: 'bg-gray-500', probability: 10 },
+    { name: LeadStage.QUALIFIED, displayName: 'Qualified', color: 'bg-blue-500', probability: 50 },
+    { name: LeadStage.PROPOSAL, displayName: 'Proposal', color: 'bg-orange-500', probability: 75 },
+    { name: LeadStage.NEGOTIATION, displayName: 'Negotiation', color: 'bg-purple-500', probability: 90 },
+    { name: LeadStage.CLOSED_WON, displayName: 'Closed Won', color: 'bg-green-500', probability: 100 },
+    { name: LeadStage.CLOSED_LOST, displayName: 'Closed Lost', color: 'bg-red-500', probability: 0 }
   ];
 
   useEffect(() => {
-    loadLeads();
+    const initializeComponent = async () => {
+      await checkBackendHealth();
+      await loadLeads();
+    };
+    initializeComponent();
   }, []);
 
-  const loadLeads = () => {
-    const allLeads = crmService.getLeads();
-    setLeads(allLeads);
+  const checkBackendHealth = async () => {
+    const healthResult = await apiCrmService.checkHealth();
+    setBackendHealthy(!healthResult.error);
+    if (healthResult.error) {
+      toast.error('Backend connection failed - please check server status');
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadLeads = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiCrmService.getLeads();
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      if (response.data) {
+        const mappedLeads = response.data.map(mapApiLeadToLead);
+        setLeads(mappedLeads);
+      } else {
+        throw new Error('No data received');
+      }
+    } catch (error) {
+      toast.error(`Failed to load leads: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setLeads([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Mapping functions between API and UI types
+  const mapApiLeadToLead = (apiLead: ApiLead): Lead => {
+    return {
+      id: apiLead.id?.toString() || '',
+      title: apiLead.title,
+      contactId: apiLead.contactId?.toString() || '',
+      company: '', // Will be populated from contact relationship
+      source: apiLead.source || '',
+      stage: apiLead.stage,
+      status: mapApiStageToStatus(apiLead.stage),
+      value: apiLead.value,
+      probability: apiLead.probability,
+      expectedCloseDate: apiLead.expectedCloseDate ? apiLead.expectedCloseDate.split('T')[0] : '',
+      assignedTo: apiLead.assignedUserId?.toString() || '',
+      notes: apiLead.notes || '',
+      createdAt: apiLead.createdAt || new Date().toISOString(),
+      updatedAt: apiLead.updatedAt || new Date().toISOString()
+    };
+  };
+
+  const mapLeadToApiLead = (lead: Lead): Omit<ApiLead, 'id'> => {
+    return {
+      title: lead.title,
+      description: lead.notes,
+      value: lead.value,
+      stage: mapStatusToApiStage(lead.status),
+      probability: lead.probability,
+      expectedCloseDate: lead.expectedCloseDate,
+      source: lead.source,
+      notes: lead.notes,
+      contactId: parseInt(lead.contactId)
+    };
+  };
+
+  const mapApiStageToStatus = (stage: string): Lead['status'] => {
+    switch (stage) {
+      case LeadStage.PROSPECT: return 'New';
+      case LeadStage.QUALIFIED: return 'Qualified';
+      case LeadStage.PROPOSAL: return 'Proposal';
+      case LeadStage.NEGOTIATION: return 'Negotiation';
+      case LeadStage.CLOSED_WON: return 'Closed Won';
+      case LeadStage.CLOSED_LOST: return 'Closed Lost';
+      default: return 'New';
+    }
+  };
+
+  const mapStatusToApiStage = (status: Lead['status']): ApiLead['stage'] => {
+    switch (status) {
+      case 'New': return 'PROSPECT';
+      case 'Qualified': return 'QUALIFIED';
+      case 'Proposal': return 'PROPOSAL';
+      case 'Negotiation': return 'NEGOTIATION';
+      case 'Closed Won': return 'CLOSED_WON';
+      case 'Closed Lost': return 'CLOSED_LOST';
+      default: return 'PROSPECT';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.company) {
-      toast.error('Name, email, and company are required');
+    if (!formData.name || !formData.company || !formData.email) {
+      toast.error('Name, company, and email are required');
       return;
     }
 
-    const leadData = {
-      ...formData,
-      value: parseFloat(formData.value) || 0,
-      probability: parseInt(formData.probability),
-      status: 'New' as Lead['status']
-    };
+    setIsLoading(true);
 
     try {
-      if (selectedLead) {
-        // Update existing lead
-        const updatedLeads = leads.map(lead => 
-          lead.id === selectedLead.id 
-            ? { ...lead, ...leadData, updatedAt: new Date().toISOString().split('T')[0] }
-            : lead
-        );
-        crmService.saveLeads(updatedLeads);
-        toast.success('Lead updated successfully');
+      if (backendHealthy) {
+        if (selectedLead) {
+          // Update existing lead
+          const leadData = {
+            title: formData.name,
+            description: formData.notes,
+            value: parseFloat(formData.value) || 0,
+            stage: 'PROSPECT' as ApiLead['stage'],
+            probability: parseInt(formData.probability),
+            expectedCloseDate: formData.expectedCloseDate ? `${formData.expectedCloseDate}T00:00:00` : undefined,
+            source: formData.source,
+            notes: formData.notes
+          };
+          const response = await apiCrmService.updateLead(parseInt(selectedLead.id), leadData);
+          if (response.error) {
+            throw new Error(response.error);
+          }
+          toast.success('Lead updated successfully');
+        } else {
+          // First, create or find a contact
+          let contactId: number;
+          
+          // Try to find existing contact by email
+          const contactsResponse = await apiCrmService.getContacts();
+          if (contactsResponse.error) {
+            throw new Error('Failed to fetch contacts');
+          }
+          
+          const existingContact = contactsResponse.data?.find((c: any) => c.email === formData.email);
+          
+          if (existingContact) {
+            contactId = existingContact.id!;
+          } else {
+            // Create new contact
+            const newContact = {
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone || '',
+              company: formData.company,
+              category: 'PROSPECT' as const,
+              status: 'ACTIVE' as const
+            };
+            
+            const contactResponse = await apiCrmService.createContact(newContact);
+            if (contactResponse.error || !contactResponse.data) {
+              throw new Error('Failed to create contact');
+            }
+            contactId = contactResponse.data.id!;
+          }
+          
+          // Now create the lead with the contact
+          const leadData = {
+            title: formData.name,
+            description: formData.notes,
+            value: parseFloat(formData.value) || 0,
+            stage: 'PROSPECT' as ApiLead['stage'],
+            probability: parseInt(formData.probability),
+            expectedCloseDate: formData.expectedCloseDate ? `${formData.expectedCloseDate}T00:00:00` : undefined,
+            source: formData.source,
+            notes: formData.notes,
+            contactId: contactId
+          };
+          
+          const response = await apiCrmService.createLead(leadData);
+          if (response.error) {
+            throw new Error(response.error);
+          }
+          toast.success('Lead created successfully');
+        }
       } else {
-        // Create new lead
-        crmService.createLead(leadData as any);
-        toast.success('Lead created successfully');
+        // Fallback to local storage
+        const localLeadData = {
+          ...formData,
+          value: parseFloat(formData.value) || 0,
+          probability: parseInt(formData.probability),
+          status: 'New' as Lead['status']
+        };
+        
+        // Backend is not healthy - cannot save lead
+        toast.error('Backend connection failed - cannot save lead');
+        return;
       }
       
-      loadLeads();
+      await loadLeads();
       setOpen(false);
       resetForm();
     } catch (error) {
-      toast.error('Failed to save lead');
+      toast.error(`Failed to save lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -109,31 +261,72 @@ export function LeadPipeline() {
     setSelectedLead(null);
   };
 
-  const updateLeadStatus = (leadId: string, newStatus: Lead['status']) => {
-    const stage = pipelineStages.find(s => s.name === newStatus);
-    if (stage) {
+  const mapStatusToStage = (status: Lead['status']): string => {
+    switch (status) {
+      case 'New': return LeadStage.PROSPECT;
+      case 'Qualified': return LeadStage.QUALIFIED;
+      case 'Proposal': return LeadStage.PROPOSAL;
+      case 'Negotiation': return LeadStage.NEGOTIATION;
+      case 'Closed Won': return LeadStage.CLOSED_WON;
+      case 'Closed Lost': return LeadStage.CLOSED_LOST;
+      default: return LeadStage.PROSPECT;
+    }
+  };
+
+  const updateLeadStatus = async (leadId: string, newStatus: Lead['status']) => {
+    const stageValue = mapStatusToStage(newStatus);
+    const stage = pipelineStages.find(s => s.name === stageValue);
+    if (!stage) return;
+
+    try {
+      setIsLoading(true);
+      const leadToUpdate = leads.find(l => l.id === leadId);
+      if (!leadToUpdate) return;
+
+      const updatedLead = {
+        ...leadToUpdate,
+        status: newStatus,
+        probability: stage.probability,
+        updatedAt: new Date().toISOString().split('T')[0]
+      };
+
+      if (backendHealthy) {
+        // Map to API format
+        const apiLead: ApiLead = {
+          id: parseInt(updatedLead.id),
+          title: updatedLead.title,
+          contactId: parseInt(updatedLead.contactId),
+          value: updatedLead.value,
+          stage: mapStatusToApiStage(updatedLead.status),
+          probability: updatedLead.probability,
+          expectedCloseDate: updatedLead.expectedCloseDate ? `${updatedLead.expectedCloseDate}T00:00:00` : undefined,
+          source: updatedLead.source,
+          notes: updatedLead.notes
+        };
+
+        await apiCrmService.updateLead(apiLead.id, apiLead);
+      }
+
       const updatedLeads = leads.map(lead => 
-        lead.id === leadId 
-          ? { 
-              ...lead, 
-              status: newStatus, 
-              probability: stage.probability,
-              updatedAt: new Date().toISOString().split('T')[0]
-            }
-          : lead
+        lead.id === leadId ? updatedLead : lead
       );
-      crmService.saveLeads(updatedLeads);
+      
+      // Update local state
       setLeads(updatedLeads);
       toast.success(`Lead moved to ${newStatus}`);
+    } catch (error) {
+      toast.error(`Failed to update lead status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const editLead = (lead: Lead) => {
     setSelectedLead(lead);
     setFormData({
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
+      name: lead.title,
+      email: '', // Will be fetched from contact
+      phone: '', // Will be fetched from contact,
       company: lead.company,
       source: lead.source,
       value: lead.value.toString(),
@@ -372,7 +565,7 @@ export function LeadPipeline() {
             <Card key={stage.name} className="border-0 shadow-md">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">{stage.name}</CardTitle>
+                  <CardTitle className="text-sm font-medium">{stage.displayName}</CardTitle>
                   <Badge variant="outline" className="text-xs">
                     {stageLeads.length}
                   </Badge>
@@ -390,9 +583,9 @@ export function LeadPipeline() {
                       onClick={() => editLead(lead)}
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-sm text-gray-900">{lead.name}</h4>
+                        <h4 className="font-medium text-sm text-gray-900">{lead.title}</h4>
                         <div className="flex space-x-1">
-                          {stage.name !== 'Closed Won' && stage.name !== 'Closed Lost' && (
+                          {stage.name !== LeadStage.CLOSED_WON && stage.name !== LeadStage.CLOSED_LOST && (
                             <Button
                               size="sm"
                               variant="ghost"
