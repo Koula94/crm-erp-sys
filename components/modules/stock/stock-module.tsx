@@ -162,9 +162,9 @@ export function StockModule() {
 
   const getStockStatus = (current: number, min: number) => {
     const percentage = (current / (min * 2)) * 100;
-    if (percentage <= 50) return { status: 'Low', color: 'destructive' };
-    if (percentage <= 100) return { status: 'Medium', color: 'secondary' };
-    return { status: 'Good', color: 'default' };
+    if (percentage <= 50) return { status: 'Low', color: 'destructive' as const };
+    if (percentage <= 100) return { status: 'Medium', color: 'secondary' as const };
+    return { status: 'Good', color: 'default' as const };
   };
 
   const getConditionColor = (condition: string) => {

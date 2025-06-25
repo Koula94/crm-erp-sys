@@ -37,22 +37,92 @@ import {
   Filter,
   BarChart3
 } from 'lucide-react';
-import { CRMService } from '@/lib/crm-data';
+// Removed CRMService import - using only API service
+import { ApiCrmService } from './api-crm-service';
+import { toast } from 'sonner';
 
 export function CRMAnalytics() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [timeRange, setTimeRange] = useState('30');
   const [reportType, setReportType] = useState('overview');
+  const [isLoading, setIsLoading] = useState(false);
+  const [backendHealthy, setBackendHealthy] = useState(false);
 
-  const crmService = CRMService.getInstance();
+  const apiCrmService: any = new ApiCrmService();
 
   useEffect(() => {
-    loadAnalytics();
-  }, [timeRange]);
+    checkBackendHealth();
+  }, []);
 
-  const loadAnalytics = () => {
-    const data = crmService.getAnalytics();
-    setAnalytics(data);
+  useEffect(() => {
+    if (backendHealthy !== null) {
+      loadAnalytics();
+    }
+  }, [timeRange, backendHealthy]);
+
+  const checkBackendHealth = async () => {
+    try {
+      await apiCrmService.checkHealth();
+      setBackendHealthy(true);
+    } catch (error) {
+      setBackendHealthy(false);
+      toast.error('Backend connection failed - please check server status');
+    }
+  };
+
+  const loadAnalytics = async () => {
+    try {
+      setIsLoading(true);
+      
+      if (backendHealthy) {
+        // Try to get analytics from backend
+        const [contactStats, leadStats, quoteStats] = await Promise.all([
+          apiCrmService.getContactStats(),
+          apiCrmService.getLeadStats(),
+          apiCrmService.getQuoteStats()
+        ]);
+        
+        const backendAnalytics = {
+          totalContacts: contactStats.total,
+          activeContacts: contactStats.active,
+          totalLeads: leadStats.total,
+          convertedLeads: leadStats.converted,
+          totalQuotes: quoteStats.total,
+          acceptedQuotes: quoteStats.accepted,
+          totalRevenue: quoteStats.totalValue,
+          conversionRate: leadStats.total > 0 ? (leadStats.converted / leadStats.total) * 100 : 0
+        };
+        
+        setAnalytics(backendAnalytics);
+      } else {
+        // Show empty analytics when backend is not available
+        setAnalytics({
+          totalContacts: 0,
+          activeContacts: 0,
+          totalLeads: 0,
+          convertedLeads: 0,
+          totalQuotes: 0,
+          acceptedQuotes: 0,
+          totalRevenue: 0,
+          conversionRate: 0
+        });
+        toast.error('Backend connection failed - cannot load analytics');
+      }
+    } catch (error) {
+      toast.error(`Failed to load analytics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAnalytics({
+        totalContacts: 0,
+        activeContacts: 0,
+        totalLeads: 0,
+        convertedLeads: 0,
+        totalQuotes: 0,
+        acceptedQuotes: 0,
+        totalRevenue: 0,
+        conversionRate: 0
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const generateSalesData = () => {
@@ -77,18 +147,9 @@ export function CRMAnalytics() {
   };
 
   const generateActivityData = () => {
-    const contacts = crmService.getContacts();
-    const communications = crmService.getCommunications();
-    
-    return contacts.slice(0, 10).map(contact => ({
-      name: contact.name,
-      company: contact.company,
-      lastContact: communications
-        .filter(c => c.contactId === contact.id)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.date || 'Never',
-      totalInteractions: communications.filter(c => c.contactId === contact.id).length,
-      status: contact.status
-    }));
+    // Return empty activity data since we no longer use mock data
+    // Activity data would need to be fetched from the backend API
+    return [];
   };
 
   const exportReport = () => {
